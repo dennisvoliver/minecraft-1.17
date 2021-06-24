@@ -1,0 +1,102 @@
+package net.minecraft.client.gui.screen;
+
+import it.unimi.dsi.fastutil.booleans.BooleanConsumer;
+import net.fabricmc.api.EnvType;
+import net.fabricmc.api.Environment;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.widget.ButtonWidget;
+import net.minecraft.client.gui.widget.CyclingButtonWidget;
+import net.minecraft.client.gui.widget.TextFieldWidget;
+import net.minecraft.client.network.ServerAddress;
+import net.minecraft.client.network.ServerInfo;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.text.Text;
+import net.minecraft.text.TranslatableText;
+
+@Environment(EnvType.CLIENT)
+public class AddServerScreen extends Screen {
+   private static final Text ENTER_NAME_TEXT = new TranslatableText("addServer.enterName");
+   private static final Text ENTER_IP_TEXT = new TranslatableText("addServer.enterIp");
+   private ButtonWidget addButton;
+   private final BooleanConsumer callback;
+   private final ServerInfo server;
+   private TextFieldWidget addressField;
+   private TextFieldWidget serverNameField;
+   private final Screen parent;
+
+   public AddServerScreen(Screen parent, BooleanConsumer callback, ServerInfo server) {
+      super(new TranslatableText("addServer.title"));
+      this.parent = parent;
+      this.callback = callback;
+      this.server = server;
+   }
+
+   public void tick() {
+      this.serverNameField.tick();
+      this.addressField.tick();
+   }
+
+   protected void init() {
+      this.client.keyboard.setRepeatEvents(true);
+      this.serverNameField = new TextFieldWidget(this.textRenderer, this.width / 2 - 100, 66, 200, 20, new TranslatableText("addServer.enterName"));
+      this.serverNameField.setTextFieldFocused(true);
+      this.serverNameField.setText(this.server.name);
+      this.serverNameField.setChangedListener((serverName) -> {
+         this.updateAddButton();
+      });
+      this.addSelectableChild(this.serverNameField);
+      this.addressField = new TextFieldWidget(this.textRenderer, this.width / 2 - 100, 106, 200, 20, new TranslatableText("addServer.enterIp"));
+      this.addressField.setMaxLength(128);
+      this.addressField.setText(this.server.address);
+      this.addressField.setChangedListener((address) -> {
+         this.updateAddButton();
+      });
+      this.addSelectableChild(this.addressField);
+      this.addDrawableChild(CyclingButtonWidget.builder(ServerInfo.ResourcePackPolicy::getName).values((Object[])ServerInfo.ResourcePackPolicy.values()).initially(this.server.getResourcePackPolicy()).build(this.width / 2 - 100, this.height / 4 + 72, 200, 20, new TranslatableText("addServer.resourcePack"), (button, resourcePackPolicy) -> {
+         this.server.setResourcePackPolicy(resourcePackPolicy);
+      }));
+      this.addButton = (ButtonWidget)this.addDrawableChild(new ButtonWidget(this.width / 2 - 100, this.height / 4 + 96 + 18, 200, 20, new TranslatableText("addServer.add"), (button) -> {
+         this.addAndClose();
+      }));
+      this.addDrawableChild(new ButtonWidget(this.width / 2 - 100, this.height / 4 + 120 + 18, 200, 20, ScreenTexts.CANCEL, (button) -> {
+         this.callback.accept(false);
+      }));
+      this.updateAddButton();
+   }
+
+   public void resize(MinecraftClient client, int width, int height) {
+      String string = this.addressField.getText();
+      String string2 = this.serverNameField.getText();
+      this.init(client, width, height);
+      this.addressField.setText(string);
+      this.serverNameField.setText(string2);
+   }
+
+   public void removed() {
+      this.client.keyboard.setRepeatEvents(false);
+   }
+
+   private void addAndClose() {
+      this.server.name = this.serverNameField.getText();
+      this.server.address = this.addressField.getText();
+      this.callback.accept(true);
+   }
+
+   public void onClose() {
+      this.client.openScreen(this.parent);
+   }
+
+   private void updateAddButton() {
+      this.addButton.active = ServerAddress.isValid(this.addressField.getText()) && !this.serverNameField.getText().isEmpty();
+   }
+
+   public void render(MatrixStack matrices, int mouseX, int mouseY, float delta) {
+      this.renderBackground(matrices);
+      drawCenteredText(matrices, this.textRenderer, this.title, this.width / 2, 17, 16777215);
+      drawTextWithShadow(matrices, this.textRenderer, ENTER_NAME_TEXT, this.width / 2 - 100, 53, 10526880);
+      drawTextWithShadow(matrices, this.textRenderer, ENTER_IP_TEXT, this.width / 2 - 100, 94, 10526880);
+      this.serverNameField.render(matrices, mouseX, mouseY, delta);
+      this.addressField.render(matrices, mouseX, mouseY, delta);
+      super.render(matrices, mouseX, mouseY, delta);
+   }
+}

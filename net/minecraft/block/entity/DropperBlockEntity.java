@@ -1,0 +1,16 @@
+package net.minecraft.block.entity;
+
+import net.minecraft.block.BlockState;
+import net.minecraft.text.Text;
+import net.minecraft.text.TranslatableText;
+import net.minecraft.util.math.BlockPos;
+
+public class DropperBlockEntity extends DispenserBlockEntity {
+   public DropperBlockEntity(BlockPos blockPos, BlockState blockState) {
+      super(BlockEntityType.DROPPER, blockPos, blockState);
+   }
+
+   protected Text getContainerName() {
+      return new TranslatableText("container.dropper");
+   }
+}

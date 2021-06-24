@@ -1,0 +1,62 @@
+package net.minecraft.client.particle;
+
+import net.fabricmc.api.EnvType;
+import net.fabricmc.api.Environment;
+import net.minecraft.client.world.ClientWorld;
+import net.minecraft.particle.DefaultParticleType;
+import net.minecraft.util.math.MathHelper;
+
+@Environment(EnvType.CLIENT)
+public class EmotionParticle extends SpriteBillboardParticle {
+   EmotionParticle(ClientWorld clientWorld, double d, double e, double f) {
+      super(clientWorld, d, e, f, 0.0D, 0.0D, 0.0D);
+      this.field_28787 = true;
+      this.field_28786 = 0.86F;
+      this.velocityX *= 0.009999999776482582D;
+      this.velocityY *= 0.009999999776482582D;
+      this.velocityZ *= 0.009999999776482582D;
+      this.velocityY += 0.1D;
+      this.scale *= 1.5F;
+      this.maxAge = 16;
+      this.collidesWithWorld = false;
+   }
+
+   public ParticleTextureSheet getType() {
+      return ParticleTextureSheet.PARTICLE_SHEET_OPAQUE;
+   }
+
+   public float getSize(float tickDelta) {
+      return this.scale * MathHelper.clamp(((float)this.age + tickDelta) / (float)this.maxAge * 32.0F, 0.0F, 1.0F);
+   }
+
+   @Environment(EnvType.CLIENT)
+   public static class AngryVillagerFactory implements ParticleFactory<DefaultParticleType> {
+      private final SpriteProvider spriteProvider;
+
+      public AngryVillagerFactory(SpriteProvider spriteProvider) {
+         this.spriteProvider = spriteProvider;
+      }
+
+      public Particle createParticle(DefaultParticleType defaultParticleType, ClientWorld clientWorld, double d, double e, double f, double g, double h, double i) {
+         EmotionParticle emotionParticle = new EmotionParticle(clientWorld, d, e + 0.5D, f);
+         emotionParticle.setSprite(this.spriteProvider);
+         emotionParticle.setColor(1.0F, 1.0F, 1.0F);
+         return emotionParticle;
+      }
+   }
+
+   @Environment(EnvType.CLIENT)
+   public static class HeartFactory implements ParticleFactory<DefaultParticleType> {
+      private final SpriteProvider spriteProvider;
+
+      public HeartFactory(SpriteProvider spriteProvider) {
+         this.spriteProvider = spriteProvider;
+      }
+
+      public Particle createParticle(DefaultParticleType defaultParticleType, ClientWorld clientWorld, double d, double e, double f, double g, double h, double i) {
+         EmotionParticle emotionParticle = new EmotionParticle(clientWorld, d, e, f);
+         emotionParticle.setSprite(this.spriteProvider);
+         return emotionParticle;
+      }
+   }
+}

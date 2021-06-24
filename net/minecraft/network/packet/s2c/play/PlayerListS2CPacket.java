@@ -1,0 +1,223 @@
+package net.minecraft.network.packet.s2c.play;
+
+import com.google.common.base.MoreObjects;
+import com.google.common.collect.Lists;
+import com.mojang.authlib.GameProfile;
+import com.mojang.authlib.properties.Property;
+import com.mojang.authlib.properties.PropertyMap;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Objects;
+import net.minecraft.network.Packet;
+import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.listener.ClientPlayPacketListener;
+import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.text.Text;
+import net.minecraft.world.GameMode;
+import org.jetbrains.annotations.Nullable;
+
+public class PlayerListS2CPacket implements Packet<ClientPlayPacketListener> {
+   private final PlayerListS2CPacket.Action action;
+   private final List<PlayerListS2CPacket.Entry> entries;
+
+   public PlayerListS2CPacket(PlayerListS2CPacket.Action action, ServerPlayerEntity... players) {
+      this.action = action;
+      this.entries = Lists.newArrayListWithCapacity(players.length);
+      ServerPlayerEntity[] var3 = players;
+      int var4 = players.length;
+
+      for(int var5 = 0; var5 < var4; ++var5) {
+         ServerPlayerEntity serverPlayerEntity = var3[var5];
+         this.entries.add(new PlayerListS2CPacket.Entry(serverPlayerEntity.getGameProfile(), serverPlayerEntity.pingMilliseconds, serverPlayerEntity.interactionManager.getGameMode(), serverPlayerEntity.getPlayerListName()));
+      }
+
+   }
+
+   public PlayerListS2CPacket(PlayerListS2CPacket.Action action, Collection<ServerPlayerEntity> players) {
+      this.action = action;
+      this.entries = Lists.newArrayListWithCapacity(players.size());
+      Iterator var3 = players.iterator();
+
+      while(var3.hasNext()) {
+         ServerPlayerEntity serverPlayerEntity = (ServerPlayerEntity)var3.next();
+         this.entries.add(new PlayerListS2CPacket.Entry(serverPlayerEntity.getGameProfile(), serverPlayerEntity.pingMilliseconds, serverPlayerEntity.interactionManager.getGameMode(), serverPlayerEntity.getPlayerListName()));
+      }
+
+   }
+
+   public PlayerListS2CPacket(PacketByteBuf buf) {
+      this.action = (PlayerListS2CPacket.Action)buf.readEnumConstant(PlayerListS2CPacket.Action.class);
+      PlayerListS2CPacket.Action var10002 = this.action;
+      Objects.requireNonNull(var10002);
+      this.entries = buf.readList(var10002::read);
+   }
+
+   public void write(PacketByteBuf buf) {
+      buf.writeEnumConstant(this.action);
+      List var10001 = this.entries;
+      PlayerListS2CPacket.Action var10002 = this.action;
+      Objects.requireNonNull(var10002);
+      buf.writeCollection(var10001, var10002::write);
+   }
+
+   public void apply(ClientPlayPacketListener clientPlayPacketListener) {
+      clientPlayPacketListener.onPlayerList(this);
+   }
+
+   public List<PlayerListS2CPacket.Entry> getEntries() {
+      return this.entries;
+   }
+
+   public PlayerListS2CPacket.Action getAction() {
+      return this.action;
+   }
+
+   @Nullable
+   static Text readOptionalText(PacketByteBuf buf) {
+      return buf.readBoolean() ? buf.readText() : null;
+   }
+
+   static void writeOptionalText(PacketByteBuf buf, @Nullable Text text) {
+      if (text == null) {
+         buf.writeBoolean(false);
+      } else {
+         buf.writeBoolean(true);
+         buf.writeText(text);
+      }
+
+   }
+
+   public String toString() {
+      return MoreObjects.toStringHelper((Object)this).add("action", this.action).add("entries", this.entries).toString();
+   }
+
+   public static enum Action {
+      ADD_PLAYER {
+         protected PlayerListS2CPacket.Entry read(PacketByteBuf buf) {
+            GameProfile gameProfile = new GameProfile(buf.readUuid(), buf.readString(16));
+            PropertyMap propertyMap = gameProfile.getProperties();
+            buf.forEachInCollection((bufx) -> {
+               String string = bufx.readString();
+               String string2 = bufx.readString();
+               if (bufx.readBoolean()) {
+                  String string3 = bufx.readString();
+                  propertyMap.put(string, new Property(string, string2, string3));
+               } else {
+                  propertyMap.put(string, new Property(string, string2));
+               }
+
+            });
+            GameMode gameMode = GameMode.byId(buf.readVarInt());
+            int i = buf.readVarInt();
+            Text text = PlayerListS2CPacket.readOptionalText(buf);
+            return new PlayerListS2CPacket.Entry(gameProfile, i, gameMode, text);
+         }
+
+         protected void write(PacketByteBuf buf, PlayerListS2CPacket.Entry entry) {
+            buf.writeUuid(entry.getProfile().getId());
+            buf.writeString(entry.getProfile().getName());
+            buf.writeCollection(entry.getProfile().getProperties().values(), (bufx, property) -> {
+               bufx.writeString(property.getName());
+               bufx.writeString(property.getValue());
+               if (property.hasSignature()) {
+                  bufx.writeBoolean(true);
+                  bufx.writeString(property.getSignature());
+               } else {
+                  bufx.writeBoolean(false);
+               }
+
+            });
+            buf.writeVarInt(entry.getGameMode().getId());
+            buf.writeVarInt(entry.getLatency());
+            PlayerListS2CPacket.writeOptionalText(buf, entry.getDisplayName());
+         }
+      },
+      UPDATE_GAME_MODE {
+         protected PlayerListS2CPacket.Entry read(PacketByteBuf buf) {
+            GameProfile gameProfile = new GameProfile(buf.readUuid(), (String)null);
+            GameMode gameMode = GameMode.byId(buf.readVarInt());
+            return new PlayerListS2CPacket.Entry(gameProfile, 0, gameMode, (Text)null);
+         }
+
+         protected void write(PacketByteBuf buf, PlayerListS2CPacket.Entry entry) {
+            buf.writeUuid(entry.getProfile().getId());
+            buf.writeVarInt(entry.getGameMode().getId());
+         }
+      },
+      UPDATE_LATENCY {
+         protected PlayerListS2CPacket.Entry read(PacketByteBuf buf) {
+            GameProfile gameProfile = new GameProfile(buf.readUuid(), (String)null);
+            int i = buf.readVarInt();
+            return new PlayerListS2CPacket.Entry(gameProfile, i, (GameMode)null, (Text)null);
+         }
+
+         protected void write(PacketByteBuf buf, PlayerListS2CPacket.Entry entry) {
+            buf.writeUuid(entry.getProfile().getId());
+            buf.writeVarInt(entry.getLatency());
+         }
+      },
+      UPDATE_DISPLAY_NAME {
+         protected PlayerListS2CPacket.Entry read(PacketByteBuf buf) {
+            GameProfile gameProfile = new GameProfile(buf.readUuid(), (String)null);
+            Text text = PlayerListS2CPacket.readOptionalText(buf);
+            return new PlayerListS2CPacket.Entry(gameProfile, 0, (GameMode)null, text);
+         }
+
+         protected void write(PacketByteBuf buf, PlayerListS2CPacket.Entry entry) {
+            buf.writeUuid(entry.getProfile().getId());
+            PlayerListS2CPacket.writeOptionalText(buf, entry.getDisplayName());
+         }
+      },
+      REMOVE_PLAYER {
+         protected PlayerListS2CPacket.Entry read(PacketByteBuf buf) {
+            GameProfile gameProfile = new GameProfile(buf.readUuid(), (String)null);
+            return new PlayerListS2CPacket.Entry(gameProfile, 0, (GameMode)null, (Text)null);
+         }
+
+         protected void write(PacketByteBuf buf, PlayerListS2CPacket.Entry entry) {
+            buf.writeUuid(entry.getProfile().getId());
+         }
+      };
+
+      protected abstract PlayerListS2CPacket.Entry read(PacketByteBuf buf);
+
+      protected abstract void write(PacketByteBuf buf, PlayerListS2CPacket.Entry entry);
+   }
+
+   public static class Entry {
+      private final int latency;
+      private final GameMode gameMode;
+      private final GameProfile profile;
+      @Nullable
+      private final Text displayName;
+
+      public Entry(GameProfile profile, int latency, @Nullable GameMode gameMode, @Nullable Text displayName) {
+         this.profile = profile;
+         this.latency = latency;
+         this.gameMode = gameMode;
+         this.displayName = displayName;
+      }
+
+      public GameProfile getProfile() {
+         return this.profile;
+      }
+
+      public int getLatency() {
+         return this.latency;
+      }
+
+      public GameMode getGameMode() {
+         return this.gameMode;
+      }
+
+      @Nullable
+      public Text getDisplayName() {
+         return this.displayName;
+      }
+
+      public String toString() {
+         return MoreObjects.toStringHelper((Object)this).add("latency", this.latency).add("gameMode", this.gameMode).add("profile", this.profile).add("displayName", this.displayName == null ? null : Text.Serializer.toJson(this.displayName)).toString();
+      }
+   }
+}
